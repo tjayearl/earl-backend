@@ -1,25 +1,39 @@
-from fastapi import FastAPI
+# main.py
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from services.openai_service import ask_e_a_r_l
-from services.language_detection import detect_language
+from services.logger import log_chat
+import os
 
-app = FastAPI(title="E.A.R.L. - Enhanced Assistant for Real Life")
+app = FastAPI()
 
-class Query(BaseModel):
-    message: str
+# Add CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def root():
-    return {"message": "Welcome to E.A.R.L. - Your AI Assistant"}
+# Chat request model
+class ChatRequest(BaseModel):
+    prompt: str
+    mode: str = "default"
+    model: str = "gpt-4o"
 
 @app.post("/chat")
-def chat(query: Query):
-    user_message = query.message
-    language = detect_language(user_message)
-    reply = ask_e_a_r_l(user_message)
+def chat_with_earl(request: ChatRequest):
+    response = ask_e_a_r_l(request.prompt, request.mode, request.model)
+    log_chat(request.prompt, response)
+    return {"response": response}
 
-    return {
-        "user_message": user_message,
-        "detected_language": language,
-        "earl_reply": reply
-    }
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    content = await file.read()
+    # Save file to local dir (optional: process it)
+    with open(f"uploads/{file.filename}", "wb") as f:
+        f.write(content)
+    return {"filename": file.filename, "message": "Upload successful"}
+
