@@ -1,39 +1,59 @@
-# main.py
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from services.openai_service import ask_e_a_r_l
-from services.logger import log_chat
-import os
+from typing import List
+import uuid
 
 app = FastAPI()
 
-# Add CORS
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # For dev: allow all, change in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Chat request model
+# In-memory databases
+chat_history = []
+reminders = []
+
+# Models
 class ChatRequest(BaseModel):
-    prompt: str
-    mode: str = "default"
-    model: str = "gpt-4o"
+    message: str
 
+class ReminderRequest(BaseModel):
+    text: str
+
+class Reminder(BaseModel):
+    id: str
+    text: str
+
+# Routes
 @app.post("/chat")
-def chat_with_earl(request: ChatRequest):
-    response = ask_e_a_r_l(request.prompt, request.mode, request.model)
-    log_chat(request.prompt, response)
-    return {"response": response}
+def chat(req: ChatRequest):
+    user_msg = {"sender": "You", "text": req.message}
+    ai_reply = {"sender": "E.A.R.L", "text": f"Hello! You said: {req.message}"}
+    chat_history.extend([user_msg, ai_reply])
+    return {"reply": ai_reply["text"]}
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    content = await file.read()
-    # Save file to local dir (optional: process it)
-    with open(f"uploads/{file.filename}", "wb") as f:
-        f.write(content)
-    return {"filename": file.filename, "message": "Upload successful"}
+@app.get("/chat/history")
+def get_chat():
+    return chat_history
 
+@app.get("/reminders")
+def get_reminders():
+    return reminders
+
+@app.post("/reminders")
+def add_reminder(req: ReminderRequest):
+    reminder = {"id": str(uuid.uuid4()), "text": req.text}
+    reminders.append(reminder)
+    return reminder
+
+@app.delete("/reminders/{reminder_id}")
+def delete_reminder(reminder_id: str):
+    global reminders
+    reminders = [r for r in reminders if r["id"] != reminder_id]
+    return {"status": "deleted"}
