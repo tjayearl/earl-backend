@@ -1,16 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from dotenv import load_dotenv
+import os
 import uuid
+import openai
 from datetime import datetime
+
+# Load .env variables
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# Enable CORS for frontend (customize this in production)
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend URL in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,9 +37,9 @@ class Reminder(BaseModel):
     id: str
     text: str
 
-# SMART CHAT LOGIC
-def get_ai_response(message: str) -> str:
-    msg = message.lower()
+# Smart manual replies
+def get_manual_response(msg: str) -> str | None:
+    msg = msg.lower()
 
     if "hello" in msg or "hi" in msg:
         return "Hey there! How can I assist you today?"
@@ -50,7 +56,28 @@ def get_ai_response(message: str) -> str:
     elif "joke" in msg:
         return "Why don’t robots have brothers? Because they all share the same motherboard! 🤖"
     else:
-        return "Hmm... I didn’t quite get that. Try asking me about the time, date, or who I am!"
+        return None
+
+# Call OpenAI if manual response fails
+def get_ai_response(message: str) -> str:
+    manual = get_manual_response(message)
+    if manual:
+        return manual
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # or gpt-4 if you're using that
+            messages=[
+                {"role": "system", "content": "You are E.A.R.L, a friendly personal assistant."},
+                {"role": "user", "content": message},
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
+        return response.choices[0].message["content"].strip()
+    except Exception as e:
+        print("OpenAI Error:", e)
+        return "⚠️ I'm having trouble thinking right now. Try again later."
 
 # Routes
 @app.post("/chat")
@@ -58,7 +85,6 @@ def chat(req: ChatRequest):
     user_msg = {"sender": "You", "text": req.message}
     reply_text = get_ai_response(req.message)
     ai_msg = {"sender": "E.A.R.L", "text": reply_text}
-
     chat_history.extend([user_msg, ai_msg])
     return {"reply": reply_text}
 
