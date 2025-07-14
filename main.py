@@ -58,23 +58,23 @@ def get_manual_response(msg: str) -> str | None:
     else:
         return None
 
-# Call OpenAI if manual response fails
+# Use OpenAI's updated chat interface (v1.x)
 def get_ai_response(message: str) -> str:
     manual = get_manual_response(message)
     if manual:
         return manual
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # or gpt-4 if you're using that
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",  # or gpt-4 if upgraded
             messages=[
-                {"role": "system", "content": "You are E.A.R.L, a friendly personal assistant."},
+                {"role": "system", "content": "You are E.A.R.L, a helpful, polite, and intelligent personal assistant."},
                 {"role": "user", "content": message},
             ],
             temperature=0.7,
             max_tokens=200
         )
-        return response.choices[0].message["content"].strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print("OpenAI Error:", e)
         return "⚠️ I'm having trouble thinking right now. Try again later."
