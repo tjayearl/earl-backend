@@ -4,12 +4,12 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 import uuid
-import openai
+from openai import OpenAI
 from datetime import datetime
 
 # Load .env variables
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
@@ -65,7 +65,7 @@ def get_ai_response(message: str) -> str:
         return manual
 
     try:
-        response = openai.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",  # or gpt-4 if upgraded
             messages=[
                 {"role": "system", "content": "You are E.A.R.L, a helpful, polite, and intelligent personal assistant."},
