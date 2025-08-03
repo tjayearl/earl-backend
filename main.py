@@ -1,22 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-import os
-import uuid
-from openai import OpenAI
 from datetime import datetime
+from typing import Optional
+import requests
+import uuid
 
-# Load .env variables
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Ollama API URL
+OLLAMA_URL = "http://localhost:11434/api/generate"
 
 app = FastAPI()
 
-# Enable CORS for frontend
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Change to frontend domain if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,19 +24,15 @@ app.add_middleware(
 chat_history = []
 reminders = []
 
-# Models
+# Request models
 class ChatRequest(BaseModel):
     message: str
 
 class ReminderRequest(BaseModel):
     text: str
 
-class Reminder(BaseModel):
-    id: str
-    text: str
-
 # Smart manual replies
-def get_manual_response(msg: str) -> str | None:
+def get_manual_response(msg: str) -> Optional[str]:
     msg = msg.lower()
 
     if "hello" in msg or "hi" in msg:
@@ -58,26 +52,31 @@ def get_manual_response(msg: str) -> str | None:
     else:
         return None
 
-# Use OpenAI's updated chat interface (v1.x)
+# Use Ollama for AI responses
 def get_ai_response(message: str) -> str:
+    # Check manual response first
     manual = get_manual_response(message)
     if manual:
         return manual
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # or gpt-4 if upgraded
-            messages=[
-                {"role": "system", "content": "You are E.A.R.L, a helpful, polite, and intelligent personal assistant."},
-                {"role": "user", "content": message},
-            ],
-            temperature=0.7,
-            max_tokens=200
-        )
-        return response.choices[0].message.content.strip()
+        payload = {
+            "model": "llama3",  # Change if using a different model
+            "prompt": message,
+            "stream": False
+        }
+        response = requests.post(OLLAMA_URL, json=payload, timeout=120)
+
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("response", "").strip()
+
+        return f"⚠️ Ollama error: {response.status_code} - {response.text}"
+
+    except requests.exceptions.ConnectionError:
+        return "⚠️ E.A.R.L. could not connect to the local AI server."
     except Exception as e:
-        print("OpenAI Error:", e)
-        return "⚠️ I'm having trouble thinking right now. Try again later."
+        return f"⚠️ E.A.R.L. had an error: {str(e)}"
 
 # Routes
 @app.post("/chat")
@@ -89,7 +88,7 @@ def chat(req: ChatRequest):
     return {"reply": reply_text}
 
 @app.get("/chat/history")
-def get_chat():
+def get_chat_history():
     return chat_history
 
 @app.get("/reminders")

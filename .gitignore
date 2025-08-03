@@ -1,4 +1,42 @@
+# Environment variables
 .env
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# SQLite databases
 *.sqlite3
+
+# Archive files (compressed models, backups, etc.)
+*.tar.gz
+*.tgz
+*.zip
+
+# Ollama / AI model files
+models/
+*.bin
+*.bin.*
+*.safetensors
+*.onnx
+
+# Logs
+*.log
+
+# Virtual environments
+venv/
+.venv/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Node / JavaScript dependencies (if used)
+node_modules/
+
+# Backup files
+*.bak
+*.swp
+
